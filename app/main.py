@@ -11,7 +11,7 @@ import logging
 
 from app.config import settings
 from app.database import create_all_tables
-from app.routes import auth, competitions, matches, bias, statistics
+from app.routes import auth, competitions, matches, bias, statistics, admin
 
 
 # ===== LOGGING SETUP =====
@@ -141,6 +141,13 @@ app.include_router(
     prefix="/api",
     tags=["Statistics & Visualization"],
     responses={400: {"description": "Invalid parameters"}},
+)
+
+app.include_router(
+    admin.router,
+    prefix="/api",
+    tags=["Admin - Temporary Setup"],
+    responses={403: {"description": "Invalid setup key"}},
 )
 
 
