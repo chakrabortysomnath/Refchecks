@@ -3,21 +3,80 @@ Authentication routes for Google OAuth 2.0.
 Handles user login, token generation, and JWT validation.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from google.auth.transport import requests
 from google.oauth2 import id_token
 import logging
+from typing import Optional
 
 from app.config import settings, GOOGLE_OAUTH_CONFIG
 from app.database import get_db
 from app.models import User
 from app.schemas import GoogleTokenRequest, TokenResponse, UserResponse
-from app.utils.security import create_access_token
+from app.utils.security import create_access_token, verify_access_token
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# ===== HELPER: Extract Token from Header =====
+
+def get_token_from_header(authorization: Optional[str] = Header(None)) -> str:
+    """Extract JWT token from Authorization header"""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return parts[1]
+
+
+# ===== DEPENDENCY: Get Current User =====
+
+async def get_current_user(
+    token: str = Depends(get_token_from_header),
+    db: Session = Depends(get_db),
+) -> User:
+    """
+    Dependency to get current authenticated user from JWT token.
+    
+    Usage in routes:
+        @router.get("/protected")
+        def protected_route(current_user: User = Depends(get_current_user)):
+            return {"user": current_user.email}
+    """
+    payload = verify_access_token(token)
+    user_id = payload.get("sub")
+    
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return user
 
 
 # ===== GOOGLE OAUTH LOGIN =====
@@ -103,10 +162,10 @@ async def google_login(request: GoogleTokenRequest, db: Session = Depends(get_db
         )
 
 
-# ===== TOKEN VERIFICATION (for debugging) =====
+# ===== GET CURRENT USER INFO =====
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user(current_user: User = Depends(get_current_user)):
+async def get_me(current_user: User = Depends(get_current_user)):
     """
     Get current authenticated user information.
     Requires valid JWT token in Authorization header.
@@ -118,61 +177,3 @@ async def get_current_user(current_user: User = Depends(get_current_user)):
         UserResponse with user details
     """
     return UserResponse.model_validate(current_user)
-
-
-# ===== DEPENDENCY: Get Current User =====
-
-async def get_current_user(
-    token: str = Depends(get_token_from_header),
-    db: Session = Depends(get_db),
-) -> User:
-    """
-    Dependency to get current authenticated user from JWT token.
-    
-    Usage in routes:
-        @router.get("/protected")
-        def protected_route(current_user: User = Depends(get_current_user)):
-            return {"user": current_user.email}
-    """
-    from app.utils.security import verify_access_token
-    
-    payload = verify_access_token(token)
-    user_id = payload.get("sub")
-    
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    return user
-
-
-def get_token_from_header(authorization: str = None) -> str:
-    """Extract JWT token from Authorization header"""
-    if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authorization header",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    return parts[1]
