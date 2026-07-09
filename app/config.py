@@ -18,8 +18,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:password@localhost:5432/refchecks_db"
     
     # ===== GOOGLE OAUTH =====
-    google_client_id: str = "267372237255-o2460qj6aru70lvo7is9q8f7t0btoa71.apps.googleusercontent.com"
-    google_client_secret: str = "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"
+    # google_client_id: str = "267372237255-o2460qj6aru70lvo7is9q8f7t0btoa71.apps.googleusercontent.com"
+    # google_client_secret: str = "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"
+    google_client_id: str = "YOUR_GOOGLE_CLIENT_ID_HERE"
+    google_client_secret: str = "YOUR_GOOGLE_CLIENT_SECRET_HERE"
     
     # ===== JWT & SECURITY =====
     secret_key: str = "your-secret-key-change-in-production"

@@ -143,8 +143,8 @@ GET    /                          # API info
 
 **Credentials embedded in `.env.example`:**
 ```
-GOOGLE_CLIENT_ID: 267372237255-o2460qj6aru70lvo7is9q8f7t0btoa71.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET: 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
+Client ID: YOUR_GOOGLE_CLIENT_ID_HERE
+Client Secret: YOUR_GOOGLE_CLIENT_SECRET_HERE
 ```
 
 ### 2. **Statsbomb Data Pipeline**
