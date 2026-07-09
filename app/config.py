@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     
     # ===== STATSBOMB =====
-    statsbomb_data_repo: str = "https://github.com/statsbomb/StatsBombOpenData"
+    statsbomb_data_repo: str = "https://github.com/statsbomb/open-data"
     
     # ===== API =====
     api_title: str = "RefChecks - Football Bias Analysis"

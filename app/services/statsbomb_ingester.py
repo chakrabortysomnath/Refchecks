@@ -21,7 +21,7 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://raw.githubusercontent.com/statsbomb/StatsBombOpenData/master/data"
+BASE_URL = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 
 
 # ===== FETCH COMPETITIONS =====
@@ -218,6 +218,13 @@ def load_match_data(match_data: dict, competition_id: int, db: Session):
         home_team = get_or_create_team(home_team_data, db)
         away_team = get_or_create_team(away_team_data, db)
         
+        # Statsbomb match_date is usually date-only ("2022-11-20"), sometimes with time.
+        raw_date = match_data.get("match_date", "2020-01-01")
+        try:
+            match_date_parsed = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            match_date_parsed = datetime(2020, 1, 1)
+
         # Create match
         match = Match(
             statsbomb_id=match_id,
@@ -226,12 +233,10 @@ def load_match_data(match_data: dict, competition_id: int, db: Session):
             away_team_id=away_team.id,
             home_team_name=home_team_data.get("name"),
             away_team_name=away_team_data.get("name"),
-            match_date=datetime.fromisoformat(
-                match_data.get("match_date", "2020-01-01").replace("Z", "+00:00")
-            ),
+            match_date=match_date_parsed,
             home_score=match_data.get("home_score"),
             away_score=match_data.get("away_score"),
-            status=match_data.get("status", "completed"),
+            status=match_data.get("match_status", match_data.get("status", "completed")),
         )
         db.add(match)
         db.flush()
@@ -271,6 +276,15 @@ def load_event_data(event_data: dict, match_id: int, db: Session):
         if not team:
             team = get_or_create_team(team_data, db)
         
+        # Statsbomb timestamps are formatted "HH:MM:SS.mmm" (time within the period),
+        # not "MM:SS" - convert to total seconds for consistent storage.
+        timestamp_str = event_data.get("timestamp", "00:00:00.000")
+        try:
+            h, m, s = timestamp_str.split(":")
+            timestamp_seconds = int(h) * 3600 + int(m) * 60 + int(float(s))
+        except (ValueError, AttributeError):
+            timestamp_seconds = 0
+
         # Create event
         event = Event(
             statsbomb_id=event_data.get("id"),
@@ -280,7 +294,7 @@ def load_event_data(event_data: dict, match_id: int, db: Session):
             player_name=event_data.get("player", {}).get("name"),
             event_type=event_type,
             event_subtype=event_data.get("type", {}).get("subtype"),
-            timestamp=int(event_data.get("timestamp", "0:00").split(":")[0]),
+            timestamp=timestamp_seconds,
             period=event_data.get("period"),
             x=event_data.get("location", [None, None])[0],
             y=event_data.get("location", [None, None])[1],
