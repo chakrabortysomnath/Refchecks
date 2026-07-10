@@ -1,7 +1,17 @@
+import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
+import AnalysisControls from '../components/AnalysisControls'
+import type { AttackDefinition, DefenseDefinition } from '../api/types'
 
 export default function Dashboard() {
   const { user, logout } = useAuth()
+
+  // Selection state that drives the bias table + charts in later phases.
+  const [competitionId, setCompetitionId] = useState<number | null>(null)
+  const [attackDefinition, setAttackDefinition] =
+    useState<AttackDefinition>('all_combined')
+  const [defenseDefinition, setDefenseDefinition] =
+    useState<DefenseDefinition>('all_combined')
 
   return (
     <div className="min-h-full flex flex-col">
@@ -30,18 +40,27 @@ export default function Dashboard() {
       </header>
 
       <main className="flex-1">
-        <div className="mx-auto max-w-6xl px-4 py-10">
-          <h2 className="text-2xl font-bold text-slate-900">
-            Welcome{user ? `, ${user.name.split(' ')[0]}` : ''} 👋
-          </h2>
-          <p className="mt-2 text-slate-600">
-            You're signed in. The competition selector, bias metrics table, and
-            heatmap / scatter visualizations arrive in the next build phases.
-          </p>
+        <div className="mx-auto max-w-6xl px-4 py-8 space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">
+              Bias Analysis
+            </h2>
+            <p className="mt-1 text-slate-600">
+              Choose a competition and how attacks / defenses are counted.
+            </p>
+          </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <AnalysisControls
+            competitionId={competitionId}
+            attackDefinition={attackDefinition}
+            defenseDefinition={defenseDefinition}
+            onCompetitionChange={setCompetitionId}
+            onAttackChange={setAttackDefinition}
+            onDefenseChange={setDefenseDefinition}
+          />
+
+          <div className="grid gap-4 lg:grid-cols-3">
             {[
-              'Competition & definition selectors',
               'Per-team bias metrics table',
               'Foul heatmap (team × match)',
               'Attacks vs. fouls scatter plot',
@@ -53,7 +72,7 @@ export default function Dashboard() {
                 <div className="text-sm font-medium text-slate-700">
                   {title}
                 </div>
-                <div className="mt-2 text-xs">Coming soon</div>
+                <div className="mt-2 text-xs">Coming in the next phase</div>
               </div>
             ))}
           </div>
