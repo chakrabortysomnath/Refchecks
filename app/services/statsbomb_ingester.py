@@ -326,7 +326,10 @@ def load_event_data(event_data: dict, match_id: int, db: Session):
     
     except Exception as e:
         logger.error(f"Failed to load event: {e}")
-        # Don't raise, continue with other events
+        # IMPORTANT: roll back here. Without this, a single failed insert leaves
+        # the shared session in a broken state, causing every subsequent event
+        # in this match to fail too (cascading errors) until a rollback occurs.
+        db.rollback()
 
 
 # ===== CREATE FOUL RECORD =====
@@ -342,13 +345,23 @@ def create_foul_record(event: Event, event_data: dict, match_id: int, db: Sessio
         db: Database session
     """
     try:
+        # foul_committed.type and foul_committed.card are nested dicts like
+        # {"id": 24, "name": "Handball"} - extract the "name" string, since
+        # the DB columns are plain strings, not JSON.
+        foul_committed = event_data.get("foul_committed", {}) or {}
+        foul_type_raw = foul_committed.get("type")
+        card_raw = foul_committed.get("card")
+
+        foul_type_name = foul_type_raw.get("name") if isinstance(foul_type_raw, dict) else foul_type_raw
+        card_type_name = card_raw.get("name") if isinstance(card_raw, dict) else card_raw
+
         foul = Foul(
             event_id=event.id,
             match_id=match_id,
             team_fouls_id=event.team_id,
             team_fouls_against_id=None,  # Would need match context to get this
-            foul_type=event_data.get("foul_committed", {}).get("type"),
-            card_type=event_data.get("foul_committed", {}).get("card", {}).get("type"),
+            foul_type=foul_type_name,
+            card_type=card_type_name,
             timestamp=event.timestamp,
             x=event.x,
             y=event.y,
