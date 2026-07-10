@@ -140,18 +140,21 @@ def calculate_team_bias(
     logger.debug(f"Calculating bias for team {team_id} in competition {competition_id}")
     
     try:
-        # Check for cached metrics
-        if not recalculate:
-            existing = db.query(BiasMetrics).filter(
-                and_(
-                    BiasMetrics.competition_id == competition_id,
-                    BiasMetrics.team_id == team_id,
-                )
-            ).first()
-            
-            if existing:
-                logger.debug(f"Using cached metrics for team {team_id}")
-                return existing
+        # Look up any existing row for this (competition, team) pair up front -
+        # we need this reference either way: to return early (cache hit) or to
+        # update in place later (recalculation), since constructing a brand-new
+        # BiasMetrics() and merging it would try to INSERT a duplicate and
+        # silently fail against the unique constraint on (competition_id, team_id).
+        existing = db.query(BiasMetrics).filter(
+            and_(
+                BiasMetrics.competition_id == competition_id,
+                BiasMetrics.team_id == team_id,
+            )
+        ).first()
+        
+        if existing and not recalculate:
+            logger.debug(f"Using cached metrics for team {team_id}")
+            return existing
         
         # Get all matches where this team played
         matches = db.query(Match).filter(
@@ -202,41 +205,43 @@ def calculate_team_bias(
             if total_defenses > 0 else 0
         )
         
-        # Calculate chi-square test
-        # H0: Fouls are randomly distributed
-        # Expected: uniform distribution across teams
-        expected_fouls = fouls_committed  # Expected same as observed for single team
+        # Update the existing row in place if one exists, otherwise create new.
+        # This avoids the merge()-tries-to-INSERT-a-duplicate bug: mutating an
+        # already-persistent, session-tracked object and committing is a plain
+        # UPDATE, which works reliably regardless of how the row was first created.
+        if existing:
+            existing.fouls_committed_count = fouls_committed
+            existing.fouls_conceded_count = fouls_conceded
+            existing.total_attacks = total_attacks
+            existing.total_defenses = total_defenses
+            existing.fouls_per_attack = fouls_per_attack
+            existing.fouls_per_defense = fouls_per_defense
+            bias_metric = existing
+        else:
+            bias_metric = BiasMetrics(
+                competition_id=competition_id,
+                team_id=team_id,
+                fouls_committed_count=fouls_committed,
+                fouls_conceded_count=fouls_conceded,
+                total_attacks=total_attacks,
+                total_defenses=total_defenses,
+                fouls_per_attack=fouls_per_attack,
+                fouls_per_defense=fouls_per_defense,
+                chi_square_stat=None,
+                p_value=None,
+                is_significant=False,
+            )
+            db.add(bias_metric)
         
-        chi_square_stat = None
-        p_value = None
-        is_significant = False
-        
-        # Store or update metrics
-        bias_metric = BiasMetrics(
-            competition_id=competition_id,
-            team_id=team_id,
-            fouls_committed_count=fouls_committed,
-            fouls_conceded_count=fouls_conceded,
-            total_attacks=total_attacks,
-            total_defenses=total_defenses,
-            fouls_per_attack=fouls_per_attack,
-            fouls_per_defense=fouls_per_defense,
-            chi_square_stat=chi_square_stat,
-            p_value=p_value,
-            is_significant=is_significant,
-        )
-        
-        # Upsert: try to update if exists, otherwise insert
         try:
-            db.merge(bias_metric)
             db.commit()
             logger.debug(
-                f"Cached metrics for team {team_id}: "
-                f"{fouls_committed} fouls, {total_attacks} attacks, "
-                f"{total_defenses} defenses"
+                f"Saved metrics for team {team_id}: "
+                f"{fouls_committed} fouls committed, {fouls_conceded} conceded, "
+                f"{total_attacks} attacks, {total_defenses} defenses"
             )
         except Exception as e:
-            logger.warning(f"Failed to cache metrics: {e}")
+            logger.warning(f"Failed to save metrics: {e}")
             db.rollback()
         
         return bias_metric
