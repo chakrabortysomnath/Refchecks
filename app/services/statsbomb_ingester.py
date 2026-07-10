@@ -211,9 +211,24 @@ def load_match_data(match_data: dict, competition_id: int, db: Session):
             logger.debug(f"Match {match_id} already loaded")
             return
         
-        # Get or create teams
-        home_team_data = match_data.get("home_team", {})
-        away_team_data = match_data.get("away_team", {})
+        # Get or create teams.
+        # NOTE: Statsbomb's matches.json uses PREFIXED keys for team info
+        # ("home_team_id", "home_team_name", "country") - not the plain
+        # "id"/"name" shape used in events.json. Normalize here before
+        # passing to get_or_create_team(), which expects the plain shape.
+        home_team_raw = match_data.get("home_team", {})
+        away_team_raw = match_data.get("away_team", {})
+
+        home_team_data = {
+            "id": home_team_raw.get("home_team_id"),
+            "name": home_team_raw.get("home_team_name"),
+            "country": home_team_raw.get("country", {}),
+        }
+        away_team_data = {
+            "id": away_team_raw.get("away_team_id"),
+            "name": away_team_raw.get("away_team_name"),
+            "country": away_team_raw.get("country", {}),
+        }
         
         home_team = get_or_create_team(home_team_data, db)
         away_team = get_or_create_team(away_team_data, db)
