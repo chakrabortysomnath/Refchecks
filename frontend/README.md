@@ -36,7 +36,8 @@ Defined as a Blueprint in the repo-root `render.yaml`:
 1. Sync the Blueprint in Render → creates the `refchecks-frontend` static site.
 2. Set `VITE_API_URL` and `VITE_GOOGLE_CLIENT_ID` in the site's Environment.
 3. Trigger a redeploy so the vars are baked into the bundle.
-4. Add the site's `*.onrender.com` URL to the backend's `CORS_ORIGINS`.
+4. Add the site's `*.onrender.com` URL to the backend's `CORS_ORIGINS`
+   (backend API is `https://fefchecks-api.onrender.com`).
 5. Add the same URL to Google Cloud Console → Authorized JavaScript origins.
 
 > Manual fallback if the Blueprint isn't used: create a Static Site pointing at
