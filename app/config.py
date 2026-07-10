@@ -18,11 +18,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:password@localhost:5432/refchecks_db"
     
     # ===== GOOGLE OAUTH =====
-    google_client_id: str = "267372237255-o2460qj6aru70lvo7is9q8f7t0btoa71.apps.googleusercontent.com"
-    google_client_secret: str = "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"
-    
+    # Real values come from env vars (.env locally, Render dashboard in prod).
+    # Never commit real secrets here — this file is in a public repo.
+    google_client_id: str = "your-google-client-id.apps.googleusercontent.com"
+    google_client_secret: str = "your-google-client-secret"
+
     # ===== JWT & SECURITY =====
-    secret_key: str = "your-secret-key-change-in-production"
+    secret_key: str = "change-me-generate-with-openssl-rand-hex-32"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     
