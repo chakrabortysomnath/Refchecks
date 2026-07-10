@@ -151,35 +151,36 @@ def load_competition_data(
         
         logger.info(f"Loading {competition_name}")
         
-        # Check if competition already exists
+        # Check if competition already exists (idempotent - won't create a duplicate)
         comp = db.query(Competition).filter(
             Competition.statsbomb_id == competition_id
         ).first()
         
         if comp:
-            logger.info(f"Competition {competition_name} already loaded")
-            return comp
+            logger.info(f"Competition {competition_name} already exists (id={comp.id}) - will still check/load matches")
+        else:
+            # Create competition
+            comp = Competition(
+                statsbomb_id=competition_id,
+                name=comp_info.get("competition_name", competition_name.split(" - ")[0]),
+                season=comp_info["season"],
+                country=comp_info["country"],
+            )
+            db.add(comp)
+            db.commit()
+            db.refresh(comp)
+            logger.info(f"Created competition: {comp.name}")
         
-        # Create competition
-        comp = Competition(
-            statsbomb_id=competition_id,
-            name=comp_info.get("competition_name", competition_name.split(" - ")[0]),
-            season=comp_info["season"],
-            country=comp_info["country"],
-        )
-        db.add(comp)
-        db.commit()
-        db.refresh(comp)
-        
-        logger.info(f"Created competition: {comp.name}")
-        
-        # Fetch and load matches
+        # Fetch and load matches.
+        # NOTE: This always runs, even if the competition record already existed -
+        # load_match_data() checks each match individually by statsbomb_id, so
+        # already-loaded matches are skipped and only missing/failed ones are (re)loaded.
         matches_data = fetch_matches(competition_id, season_id)
         
         for match_data in matches_data:
             load_match_data(match_data, comp.id, db)
         
-        logger.info(f"Loaded {len(matches_data)} matches for {comp.name}")
+        logger.info(f"Processed {len(matches_data)} matches for {comp.name}")
         return comp
     
     except Exception as e:
