@@ -24,14 +24,54 @@ type SortKey =
   | 'fouls_per_attack'
   | 'fouls_per_defense'
 
-const COLUMNS: { key: SortKey; label: string; numeric: boolean }[] = [
-  { key: 'teamName', label: 'Team', numeric: false },
-  { key: 'fouls_committed_count', label: 'Fouls committed', numeric: true },
-  { key: 'fouls_conceded_count', label: 'Fouls conceded', numeric: true },
-  { key: 'total_attacks', label: 'Attacks', numeric: true },
-  { key: 'total_defenses', label: 'Defenses', numeric: true },
-  { key: 'fouls_per_attack', label: 'Fouls / attack', numeric: true },
-  { key: 'fouls_per_defense', label: 'Fouls / defense', numeric: true },
+const COLUMNS: {
+  key: SortKey
+  label: string
+  numeric: boolean
+  desc: string
+}[] = [
+  {
+    key: 'teamName',
+    label: 'Team',
+    numeric: false,
+    desc: 'The team; metrics are aggregated across all of its matches in the competition.',
+  },
+  {
+    key: 'fouls_committed_count',
+    label: 'Fouls committed',
+    numeric: true,
+    desc: 'Total fouls this team was penalised for committing.',
+  },
+  {
+    key: 'fouls_conceded_count',
+    label: 'Fouls conceded',
+    numeric: true,
+    desc: 'Total fouls awarded to this team (committed against them by opponents).',
+  },
+  {
+    key: 'total_attacks',
+    label: 'Attacks',
+    numeric: true,
+    desc: 'Count of attacking actions, per the selected attack definition.',
+  },
+  {
+    key: 'total_defenses',
+    label: 'Defenses',
+    numeric: true,
+    desc: 'Count of defensive actions, per the selected defense definition.',
+  },
+  {
+    key: 'fouls_per_attack',
+    label: 'Fouls / attack',
+    numeric: true,
+    desc: 'Fouls committed ÷ attacks — fouls relative to attacking volume. Higher means more fouls for how much the team attacks.',
+  },
+  {
+    key: 'fouls_per_defense',
+    label: 'Fouls / defense',
+    numeric: true,
+    desc: 'Fouls committed ÷ defenses — fouls relative to defensive volume. Higher means more fouls for how much the team defends.',
+  },
 ]
 
 const ratio = (n: number) => n.toFixed(3)
@@ -189,6 +229,7 @@ export default function BiasTable({
                   <th
                     key={col.key}
                     onClick={() => toggleSort(col.key)}
+                    title={col.desc}
                     className={
                       'cursor-pointer select-none px-4 py-2 font-medium whitespace-nowrap ' +
                       (col.numeric ? 'text-right' : 'text-left')
@@ -236,6 +277,18 @@ export default function BiasTable({
             </tbody>
           </table>
         </div>
+
+        {/* Column legend */}
+        <dl className="border-t border-slate-100 px-5 py-4 grid gap-x-8 gap-y-2 sm:grid-cols-2">
+          {COLUMNS.map((col) => (
+            <div key={col.key} className="flex gap-2 text-xs">
+              <dt className="font-medium text-slate-600 whitespace-nowrap">
+                {col.label}
+              </dt>
+              <dd className="text-slate-400">{col.desc}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </div>
   )
