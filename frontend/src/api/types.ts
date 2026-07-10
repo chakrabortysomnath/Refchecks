@@ -97,9 +97,14 @@ export interface TokenResponse {
   user: User
 }
 
-// Attack/defense definition options exposed by GET /api/definitions.
-// The exact response shape is confirmed against the route when the
-// selector hook is built; treated as string option lists here.
+// GET /api/definitions returns each definition key mapped to a human-readable
+// description.
+export interface DefinitionsResponse {
+  attack_definitions: Record<string, string>
+  defense_definitions: Record<string, string>
+}
+
+// Attack/defense definition option keys accepted by the bias-analysis endpoint.
 export type AttackDefinition =
   | 'all_combined'
   | 'shots_only'
