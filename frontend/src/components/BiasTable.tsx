@@ -13,7 +13,12 @@ interface Props {
   defenseDefinition: DefenseDefinition
 }
 
-type Row = BiasMetrics & { teamName: string }
+type Row = BiasMetrics & {
+  teamName: string
+  // Computed client-side: the two infringement-bias measures.
+  infr_defense: number // fouls committed ÷ defenses
+  infr_attack: number // fouls conceded ÷ attacks
+}
 
 type SortKey =
   | 'teamName'
@@ -21,8 +26,8 @@ type SortKey =
   | 'fouls_conceded_count'
   | 'total_attacks'
   | 'total_defenses'
-  | 'fouls_per_attack'
-  | 'fouls_per_defense'
+  | 'infr_defense'
+  | 'infr_attack'
 
 const COLUMNS: {
   key: SortKey
@@ -61,16 +66,16 @@ const COLUMNS: {
     desc: 'Count of defensive actions, per the selected defense definition.',
   },
   {
-    key: 'fouls_per_attack',
-    label: 'Fouls / attack',
+    key: 'infr_defense',
+    label: 'Infringement Bias (Defense)',
     numeric: true,
-    desc: 'Fouls committed ÷ attacks — fouls relative to attacking volume. Higher means more fouls for how much the team attacks.',
+    desc: 'Fouls the team committed ÷ its defensive actions — how much it infringes when defending. Higher means more fouls relative to how much it defends.',
   },
   {
-    key: 'fouls_per_defense',
-    label: 'Fouls / defense',
+    key: 'infr_attack',
+    label: 'Infringement Bias (Attack)',
     numeric: true,
-    desc: 'Fouls committed ÷ defenses — fouls relative to defensive volume. Higher means more fouls for how much the team defends.',
+    desc: 'Fouls opponents committed against the team ÷ its attacking actions — how much it gets fouled when attacking. Higher means it draws more fouls relative to how much it attacks.',
   },
 ]
 
@@ -90,7 +95,7 @@ export default function BiasTable({
   )
   const stats = useStatistics(competitionId)
 
-  const [sortKey, setSortKey] = useState<SortKey>('fouls_per_attack')
+  const [sortKey, setSortKey] = useState<SortKey>('infr_attack')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const nameMap = useMemo(() => {
@@ -104,6 +109,10 @@ export default function BiasTable({
     return teams.map((t) => ({
       ...t,
       teamName: nameMap.get(t.team_id) ?? `Team ${t.team_id}`,
+      infr_defense:
+        t.total_defenses > 0 ? t.fouls_committed_count / t.total_defenses : 0,
+      infr_attack:
+        t.total_attacks > 0 ? t.fouls_conceded_count / t.total_attacks : 0,
     }))
   }, [bias.data, nameMap])
 
@@ -267,10 +276,10 @@ export default function BiasTable({
                     {r.total_defenses}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">
-                    {ratio(r.fouls_per_attack)}
+                    {ratio(r.infr_defense)}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">
-                    {ratio(r.fouls_per_defense)}
+                    {ratio(r.infr_attack)}
                   </td>
                 </tr>
               ))}
