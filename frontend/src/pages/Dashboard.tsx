@@ -13,19 +13,19 @@ export default function Dashboard() {
             Refereeing Bias Analysis
           </span>
 
-          <div className="ml-auto flex items-center gap-3">
-            {user && (
+          {user && (
+            <div className="ml-auto flex items-center gap-3">
               <span className="text-sm text-pitch-100 hidden sm:inline">
                 {user.name}
               </span>
-            )}
-            <button
-              onClick={logout}
-              className="rounded-lg bg-pitch-900/40 px-3 py-1.5 text-sm font-medium hover:bg-pitch-900/60 transition"
-            >
-              Sign out
-            </button>
-          </div>
+              <button
+                onClick={logout}
+                className="rounded-lg bg-pitch-900/40 px-3 py-1.5 text-sm font-medium hover:bg-pitch-900/60 transition"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
