@@ -82,14 +82,28 @@ def calculate_competition_bias(
                 bias_metrics_list.append(metrics)
                 all_fouls_committed.append(metrics.fouls_committed_count)
         
-        # Calculate chi-square test for the entire competition
+        # Calculate chi-square test for the entire competition.
+        # NOTE: This is a single COMPETITION-WIDE test (are fouls evenly
+        # distributed across all teams?), not a per-team test - the same
+        # result is stored on every team's row to represent "how significant
+        # is the overall bias pattern in this competition."
         if len(all_fouls_committed) > 1:
             chi_square_stat, p_value = perform_chi_square_test(all_fouls_committed)
             
-            logger.info(
-                f"Competition-level chi-square: {chi_square_stat:.4f}, "
-                f"p-value: {p_value:.4f}"
-            )
+            if chi_square_stat is not None and p_value is not None:
+                logger.info(
+                    f"Competition-level chi-square: {chi_square_stat:.4f}, "
+                    f"p-value: {p_value:.4f}"
+                )
+                is_significant = p_value < 0.05
+                
+                for metrics in bias_metrics_list:
+                    metrics.chi_square_stat = chi_square_stat
+                    metrics.p_value = p_value
+                    metrics.is_significant = is_significant
+                
+                db.commit()
+                logger.info(f"Persisted chi-square results to {len(bias_metrics_list)} team records")
         
         return bias_metrics_list
     

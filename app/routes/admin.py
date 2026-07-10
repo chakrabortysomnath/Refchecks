@@ -13,6 +13,7 @@ import logging
 
 from app.database import get_db, create_all_tables, SessionLocal
 from app.config import settings
+from app.models import Foul, Match
 from app.services.statsbomb_ingester import fetch_competitions, load_competition_data
 from app.services.bias_calculator import calculate_competition_bias
 
@@ -113,3 +114,93 @@ async def load_competition(
         "message": f"Loading '{competition_name}' in the background. This can take several minutes.",
         "check_progress": "GET /api/competitions (once it appears, loading succeeded)",
     }
+
+
+# ===== BACKFILL team_fouls_against_id ON ALREADY-LOADED FOULS =====
+
+@router.post("/admin/backfill-fouls-against")
+async def backfill_fouls_against(key: str = Query(...)):
+    """
+    One-time fix for fouls loaded before team_fouls_against_id was wired up.
+    For every Foul row missing team_fouls_against_id, looks up its match's
+    home/away teams and fills in "whichever team is NOT the one that
+    committed the foul." Pure DB operation - no network calls, runs fast.
+
+    Example:
+        POST /admin/backfill-fouls-against?key=YOUR_SETUP_KEY
+    """
+    _check_key(key)
+    db = SessionLocal()
+    try:
+        fouls_missing = db.query(Foul).filter(
+            Foul.team_fouls_against_id.is_(None)
+        ).all()
+
+        updated = 0
+        skipped = 0
+
+        for foul in fouls_missing:
+            match = db.query(Match).filter(Match.id == foul.match_id).first()
+            if not match:
+                skipped += 1
+                continue
+
+            if foul.team_fouls_id == match.home_team_id:
+                foul.team_fouls_against_id = match.away_team_id
+                updated += 1
+            elif foul.team_fouls_id == match.away_team_id:
+                foul.team_fouls_against_id = match.home_team_id
+                updated += 1
+            else:
+                skipped += 1
+
+        db.commit()
+        logger.info(f"[admin] Backfilled team_fouls_against_id for {updated} fouls ({skipped} skipped)")
+        return {
+            "status": "success",
+            "fouls_examined": len(fouls_missing),
+            "updated": updated,
+            "skipped": skipped,
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"backfill_fouls_against failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ===== RECALCULATE BIAS METRICS (after backfill or code fixes) =====
+
+@router.post("/admin/recalculate-bias")
+async def recalculate_bias(
+    competition_id: int = Query(..., description="Competition ID to recalculate"),
+    key: str = Query(...),
+):
+    """
+    Recalculate bias metrics (fouls, attacks, defenses, chi-square) for a
+    competition. Use after backfill-fouls-against, or after any code fix
+    that changes how metrics are computed. Pure DB operation - fast.
+
+    Example:
+        POST /admin/recalculate-bias?competition_id=1&key=YOUR_SETUP_KEY
+    """
+    _check_key(key)
+    db = SessionLocal()
+    try:
+        metrics = calculate_competition_bias(
+            competition_id=competition_id,
+            recalculate=True,
+            db=db,
+        )
+        logger.info(f"[admin] Recalculated bias metrics for {len(metrics)} teams")
+        return {
+            "status": "success",
+            "teams_updated": len(metrics),
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"recalculate_bias failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

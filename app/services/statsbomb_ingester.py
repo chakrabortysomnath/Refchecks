@@ -8,6 +8,7 @@ import requests
 import json
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 import tempfile
 import zipfile
@@ -261,11 +262,22 @@ def load_match_data(match_data: dict, competition_id: int, db: Session):
         events_data = fetch_events(match_id)
         
         for event_data in events_data:
-            load_event_data(event_data, match.id, db)
+            load_event_data(event_data, match.id, db, home_team.id, away_team.id)
         
         db.commit()
         logger.debug(f"Loaded match {match_id} with {len(events_data)} events")
     
+    except IntegrityError as e:
+        # A concurrent request (e.g. accidentally triggering load twice) can cause
+        # two sessions to both pass the "already loaded" check before either commits.
+        # This is harmless - the other request's insert succeeded - so just roll back
+        # and move on quietly rather than logging it as an alarming failure.
+        db.rollback()
+        if "already exists" in str(e) or "UniqueViolation" in str(e):
+            logger.info(f"Match {match_data.get('match_id')} was loaded concurrently by another request - skipping")
+        else:
+            logger.error(f"Integrity error loading match: {e}", exc_info=True)
+
     except Exception as e:
         logger.error(f"Failed to load match: {e}", exc_info=True)
         db.rollback()
@@ -273,7 +285,7 @@ def load_match_data(match_data: dict, competition_id: int, db: Session):
 
 # ===== LOAD EVENT DATA =====
 
-def load_event_data(event_data: dict, match_id: int, db: Session):
+def load_event_data(event_data: dict, match_id: int, db: Session, home_team_id: int = None, away_team_id: int = None):
     """
     Load a single event (and foul if applicable).
     
@@ -281,6 +293,9 @@ def load_event_data(event_data: dict, match_id: int, db: Session):
         event_data: Event dictionary from Statsbomb API
         match_id: Match ID in database
         db: Database session
+        home_team_id: DB id of the home team in this match (used to compute
+            which team a foul was committed against)
+        away_team_id: DB id of the away team in this match
     """
     try:
         event_type = event_data.get("type", {}).get("name")
@@ -322,7 +337,7 @@ def load_event_data(event_data: dict, match_id: int, db: Session):
         
         # If it's a foul, create foul record
         if event_type == "Foul Committed":
-            create_foul_record(event, event_data, match_id, db)
+            create_foul_record(event, event_data, match_id, db, home_team_id, away_team_id)
     
     except Exception as e:
         logger.error(f"Failed to load event: {e}")
@@ -334,7 +349,14 @@ def load_event_data(event_data: dict, match_id: int, db: Session):
 
 # ===== CREATE FOUL RECORD =====
 
-def create_foul_record(event: Event, event_data: dict, match_id: int, db: Session):
+def create_foul_record(
+    event: Event,
+    event_data: dict,
+    match_id: int,
+    db: Session,
+    home_team_id: int = None,
+    away_team_id: int = None,
+):
     """
     Create a foul record from an event.
     
@@ -343,6 +365,8 @@ def create_foul_record(event: Event, event_data: dict, match_id: int, db: Sessio
         event_data: Raw Statsbomb event data
         match_id: Match ID
         db: Database session
+        home_team_id: DB id of the home team in this match
+        away_team_id: DB id of the away team in this match
     """
     try:
         # foul_committed.type and foul_committed.card are nested dicts like
@@ -355,11 +379,20 @@ def create_foul_record(event: Event, event_data: dict, match_id: int, db: Sessio
         foul_type_name = foul_type_raw.get("name") if isinstance(foul_type_raw, dict) else foul_type_raw
         card_type_name = card_raw.get("name") if isinstance(card_raw, dict) else card_raw
 
+        # The team the foul was committed AGAINST is simply "whichever of the
+        # two teams in this match is not the team that committed the foul".
+        team_fouls_against_id = None
+        if home_team_id is not None and away_team_id is not None:
+            if event.team_id == home_team_id:
+                team_fouls_against_id = away_team_id
+            elif event.team_id == away_team_id:
+                team_fouls_against_id = home_team_id
+
         foul = Foul(
             event_id=event.id,
             match_id=match_id,
             team_fouls_id=event.team_id,
-            team_fouls_against_id=None,  # Would need match context to get this
+            team_fouls_against_id=team_fouls_against_id,
             foul_type=foul_type_name,
             card_type=card_type_name,
             timestamp=event.timestamp,
