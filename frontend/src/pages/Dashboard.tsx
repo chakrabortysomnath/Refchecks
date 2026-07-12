@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import AnalysisControls from '../components/AnalysisControls'
 import BiasTable from '../components/BiasTable'
+import BiasScatter from '../components/BiasScatter'
+import FoulHeatmap from '../components/FoulHeatmap'
 import type { AttackDefinition, DefenseDefinition } from '../api/types'
 
 export default function Dashboard() {
@@ -66,21 +68,8 @@ export default function Dashboard() {
             defenseDefinition={defenseDefinition}
           />
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            {['Foul heatmap (team × match)', 'Attacks vs. fouls scatter plot'].map(
-              (title) => (
-                <div
-                  key={title}
-                  className="rounded-xl bg-white ring-1 ring-slate-200 p-5 text-slate-400"
-                >
-                  <div className="text-sm font-medium text-slate-700">
-                    {title}
-                  </div>
-                  <div className="mt-2 text-xs">Coming in the next phase</div>
-                </div>
-              ),
-            )}
-          </div>
+          <BiasScatter competitionId={competitionId} />
+          <FoulHeatmap competitionId={competitionId} />
         </div>
       </main>
 
