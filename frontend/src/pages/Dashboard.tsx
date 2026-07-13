@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import AnalysisControls from '../components/AnalysisControls'
 import WeightControls from '../components/WeightControls'
+import BackendStatus from '../components/BackendStatus'
 import FavourabilityLeaderboard from '../components/FavourabilityLeaderboard'
 import FavouredQuadrant from '../components/FavouredQuadrant'
 import FavourabilityTable from '../components/FavourabilityTable'
@@ -88,6 +89,8 @@ export default function Dashboard() {
             </p>
           </div>
 
+          <BackendStatus />
+
           <AnalysisControls
             competitionId={competitionId}
             attackDefinition={attackDefinition}
@@ -97,7 +100,12 @@ export default function Dashboard() {
             onDefenseChange={setDefenseDefinition}
           />
 
-          <WeightControls weights={weights} onChange={setWeights} />
+          <WeightControls
+            weights={weights}
+            onChange={setWeights}
+            onRefresh={() => fav.refetch()}
+            isFetching={fav.isFetching}
+          />
 
           {/* Sample-size filter */}
           <div className="rounded-xl bg-white ring-1 ring-slate-200 px-5 py-4 flex flex-wrap items-center gap-3">

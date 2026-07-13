@@ -50,4 +50,17 @@ export async function apiFetch<T>(
   return (await res.json()) as T
 }
 
+// Ping the backend's health endpoint. On Render's free tier the service spins
+// down when idle; the first request wakes it, and Render holds that request
+// open (often 30-60s) until the container is up — so this resolves true once
+// the API is live again. Used by the "Wake backend" control.
+export async function wakeBackend(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/health`, { method: 'GET' })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 export { API_URL }

@@ -4,6 +4,8 @@ import type { SeverityWeights } from '../api/types'
 interface Props {
   weights: SeverityWeights
   onChange: (w: SeverityWeights) => void
+  onRefresh: () => void
+  isFetching?: boolean
 }
 
 // Ordered high → low so the UI reads like a severity ladder.
@@ -18,7 +20,12 @@ const FIELDS: { key: keyof SeverityWeights; label: string; hint: string }[] = [
 const isDefault = (w: SeverityWeights) =>
   FIELDS.every((f) => w[f.key] === DEFAULT_WEIGHTS[f.key])
 
-export default function WeightControls({ weights, onChange }: Props) {
+export default function WeightControls({
+  weights,
+  onChange,
+  onRefresh,
+  isFetching,
+}: Props) {
   const set = (key: keyof SeverityWeights, value: number) => {
     if (Number.isNaN(value) || value < 0) return
     onChange({ ...weights, [key]: value })
@@ -37,13 +44,25 @@ export default function WeightControls({ weights, onChange }: Props) {
             recomputes.
           </p>
         </div>
-        <button
-          onClick={() => onChange({ ...DEFAULT_WEIGHTS })}
-          disabled={isDefault(weights)}
-          className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-        >
-          Reset
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => onChange({ ...DEFAULT_WEIGHTS })}
+            disabled={isDefault(weights)}
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+          >
+            Reset
+          </button>
+          <button
+            onClick={onRefresh}
+            disabled={isFetching}
+            className="flex items-center gap-2 rounded-lg bg-pitch-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-pitch-700 disabled:opacity-60"
+          >
+            {isFetching && (
+              <span className="h-3 w-3 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+            )}
+            {isFetching ? 'Updating…' : 'Apply / Refresh'}
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
