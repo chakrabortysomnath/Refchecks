@@ -6,6 +6,7 @@ import BackendStatus from '../components/BackendStatus'
 import FavourabilityLeaderboard from '../components/FavourabilityLeaderboard'
 import FavouredQuadrant from '../components/FavouredQuadrant'
 import FavourabilityTable from '../components/FavourabilityTable'
+import ReadmeTab from '../components/ReadmeTab'
 import { useFavourability } from '../hooks/useFavourability'
 import { DEFAULT_WEIGHTS } from '../api/types'
 import type {
@@ -28,6 +29,7 @@ export default function Dashboard() {
     useState<DefenseDefinition>('all_combined')
   const [weights, setWeights] = useState<SeverityWeights>({ ...DEFAULT_WEIGHTS })
   const [hideSmallSamples, setHideSmallSamples] = useState(true)
+  const [tab, setTab] = useState<'analysis' | 'readme'>('analysis')
 
   const fav = useFavourability(
     competitionId,
@@ -72,7 +74,37 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* Tab bar */}
+      <nav className="bg-white border-b border-slate-200">
+        <div className="mx-auto max-w-6xl px-4 flex gap-1">
+          {(
+            [
+              ['analysis', 'Analysis'],
+              ['readme', 'README'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={
+                'px-4 py-3 text-sm font-medium border-b-2 -mb-px transition ' +
+                (tab === key
+                  ? 'border-pitch-600 text-pitch-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800')
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
       <main className="flex-1">
+        {tab === 'readme' ? (
+          <div className="mx-auto max-w-6xl px-4 py-8">
+            <ReadmeTab />
+          </div>
+        ) : (
         <div className="mx-auto max-w-6xl px-4 py-8 space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">
@@ -179,6 +211,7 @@ export default function Dashboard() {
             model produces a genuine per-team outlier signal instead (|z| ≥ 2).
           </p>
         </div>
+        )}
       </main>
 
       <footer className="border-t border-slate-200 py-4 text-center text-xs text-slate-400">
