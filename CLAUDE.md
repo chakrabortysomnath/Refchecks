@@ -17,7 +17,7 @@ RefChecks is a football (soccer) refereeing bias analysis tool. It uses Statsbom
 ## 2. Current State (as of this handoff)
 
 ✅ **Backend is fully built, deployed, and verified working end-to-end.**
-❌ **Frontend does not exist yet.** This is the next major piece of work.
+✅ **Frontend is built** (React + Vite dashboard, through "Phase 5"). See Section 6 for exactly what exists and what's still deferred.
 
 The backend has successfully:
 - Deployed on Render as a FastAPI web service (Python 3.11)
@@ -25,8 +25,10 @@ The backend has successfully:
 - Loaded the complete 2022 FIFA World Cup dataset (64/64 matches, all events, all fouls) from Statsbomb's public GitHub data
 - Verified bias-analysis output produces sensible, real numbers for all 32 teams (fouls committed/conceded, attack/defense counts, chi-square stat, p-value)
 
-**Live API base URL**: `https://refchecks-api.onrender.com` (confirm this is still the correct hostname — check Render dashboard if unsure)
-**Interactive API docs**: `https://refchecks-api.onrender.com/docs` (Swagger UI — useful for testing any endpoint by hand)
+**Live API base URL**: `https://fefchecks-api.onrender.com` (note the `fef` spelling — this is the actual Render hostname, not a typo)
+**Interactive API docs**: `https://fefchecks-api.onrender.com/docs` (Swagger UI — useful for testing any endpoint by hand)
+
+**Frontend**: built under `frontend/` and deployed as a Render Static Site (defined by the repo-root `render.yaml` blueprint). The frontend is validated and built **only on Render** — it is not run or type-checked locally.
 
 ---
 
@@ -36,7 +38,7 @@ Auth:     Google OAuth 2.0 + JWT
 Data:     Statsbomb Open Data (https://github.com/statsbomb/open-data) — free, no API key
 Stats:    SciPy (chi-square goodness-of-fit test)
 Deploy:   Render (backend web service + PostgreSQL, both free tier)
-Frontend: NOT YET BUILT — planned as React + Vite, deployed as Render Static Site
+Frontend: BUILT — React + Vite + TypeScript + Tailwind + TanStack Query + Plotly, deployed as Render Static Site (see Section 6)
 
 ### Backend file structure (already built, don't recreate)
 app/
@@ -156,19 +158,26 @@ No urgent action needed, but don't casually delete this file without checking wh
 
 ---
 
-## 6. What's Actually Next: Build the Frontend
+## 6. Frontend — Built (Phase 5)
 
-**This is the primary task for this Claude Code session.**
+**The frontend is built.** It lives under `frontend/` and is deployed as a Render Static Site defined by the repo-root `render.yaml` blueprint. It is built and validated **only on Render** (the maintainer has no local Node toolchain) — do not assume a local dev/build step exists.
 
-### Requirements (from original product discussion)
-- **Auth**: Google OAuth login (Client ID/Secret already configured server-side)
-- **Competition selector**: dropdown, currently only 2022 World Cup has data
-- **Attack/defense definition selectors**: dropdowns matching the 4 options each (see `/api/definitions`)
-- **Bias metrics dashboard**: per-team table/cards showing fouls committed/conceded, ratios, chi-square/p-value with a clear "significant" flag
-- **Heatmap visualization**: Team × Match, colored by foul ratio intensity (data from `/api/competitions/{id}/heatmap`)
-- **Scatter plot**: Attacks (or Defenses) vs. Fouls Committed, bubble size = some weight, colored by team (data from `/api/competitions/{id}/scatter`)
-- **Responsive**: works on both desktop and mobile (originally scoped as "both" for platform)
-- **Tech preference**: React + Vite, deploy as a Render Static Site, calling the existing API via `VITE_API_URL` env var
+### What's built and working
+- **Stack**: React 18 + Vite 5 + TypeScript + Tailwind + TanStack Query + Plotly (`react-plotly.js`)
+- **Competition selector + attack/defense definition selectors** (`AnalysisControls`), driven by `/api/definitions`
+- **Per-team bias metrics table** (`BiasTable`) — fouls committed/conceded, attacks, defenses, two client-computed "infringement bias" ratios, sortable columns, header tooltips + a column legend, plus a competition-wide χ²/p-value significance banner (correctly labelled as competition-wide, not per-team — see Gotcha #6)
+- **Scatter plot** (`BiasScatter`) and **foul heatmap** (`FoulHeatmap`), both Plotly, fed by `/api/competitions/{id}/statistics`
+- **Responsive** layout (desktop + mobile)
+- Config via `VITE_API_URL` (and `VITE_GOOGLE_CLIENT_ID`), inlined at build time.
+
+### Deferred: the Google OAuth login gate
+- The full auth stack exists (`AuthContext`, `LoginPage`, `ProtectedRoute`, `@react-oauth/google`) but is **intentionally disabled** — the dashboard renders ungated because the bias-analysis endpoints are public. See `frontend/src/App.tsx`.
+- To re-enable later: wrap the `/` route in `<ProtectedRoute>` (and restore the `GoogleOAuthProvider`/`AuthProvider` wrappers), then set `VITE_GOOGLE_CLIENT_ID` and add the frontend origin to Google Cloud Console. **Not wanted right now** per product owner.
+
+### Remaining deploy-time steps (done in Render/Google, not in code)
+- Sync the `render.yaml` blueprint → creates the `refchecks-frontend` static site.
+- Set `VITE_API_URL` (`https://fefchecks-api.onrender.com`) + `VITE_GOOGLE_CLIENT_ID`, then redeploy (Vite inlines these at build time).
+- Add the resulting `*.onrender.com` URL to the backend's `CORS_ORIGINS`, or browser API calls will be blocked.
 
 ### Explicitly NOT in scope yet (Phase 2, future work)
 - User-submitted foul entries (missed/incorrect calls)
@@ -198,17 +207,17 @@ CORS_ORIGINS=<needs updating once frontend URL exists>
 
 **Important**: Once the frontend is deployed, update `CORS_ORIGINS` in Render's backend environment variables to include the frontend's URL, or API calls from the browser will be blocked.
 
-Frontend `.env` (to be created):
-VITE_API_URL=https://refchecks-api.onrender.com
+Frontend `.env` (see `frontend/.env.example`):
+VITE_API_URL=https://fefchecks-api.onrender.com
 VITE_GOOGLE_CLIENT_ID=<same client ID as backend>
 
 ---
 
 ## 8. Deployment Notes
 
-- Backend and (future) frontend are separate Render services, same GitHub repo
+- Backend and frontend are separate Render services, same GitHub repo
 - Backend: Web Service, Python runtime, `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- Frontend (planned): Static Site, `npm install && npm run build`, publish directory `dist`
+- Frontend: Static Site (`render.yaml` blueprint), `npm install && npm run build`, publish directory `dist` — builds only on Render, not locally
 - Free tier constraints: no Shell, spins down on inactivity (cold start delay on first request after idle)
 - Google OAuth redirect URIs need updating in Google Cloud Console once frontend URL is known
 
@@ -218,8 +227,8 @@ VITE_GOOGLE_CLIENT_ID=<same client ID as backend>
 
 Quick smoke test before building against it:
 ```bash
-curl https://refchecks-api.onrender.com/health
-curl https://refchecks-api.onrender.com/api/competitions
-curl "https://refchecks-api.onrender.com/api/competitions/1/bias-analysis"
+curl https://fefchecks-api.onrender.com/health
+curl https://fefchecks-api.onrender.com/api/competitions
+curl "https://fefchecks-api.onrender.com/api/competitions/1/bias-analysis"
 ```
 Expect: healthy status, one competition (2022 World Cup), and 32 teams with non-null `fouls_conceded_count` and `p_value`. If any of this looks wrong, re-read Section 4 before debugging from scratch.

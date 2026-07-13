@@ -116,3 +116,57 @@ export type DefenseDefinition =
   | 'tackles_only'
   | 'blocks_only'
   | 'duels_only'
+
+// ===== Favourability model (GET /api/competitions/{id}/favourability) =====
+
+// Configurable decision-severity weights. Higher = a more consequential
+// referee decision. Mirrors DEFAULT_WEIGHTS in favourability_calculator.py.
+export interface SeverityWeights {
+  penalty: number
+  red: number
+  yellow: number
+  foul: number
+  advantage: number
+}
+
+export const DEFAULT_WEIGHTS: SeverityWeights = {
+  penalty: 5,
+  red: 4,
+  yellow: 2,
+  foul: 1,
+  advantage: 0.5,
+}
+
+// Count of fouls by severity tier (one direction: committed or awarded).
+export type FoulBreakdown = Record<keyof SeverityWeights, number>
+
+export interface FavourabilityTeam {
+  team_id: number
+  team_name: string
+  defenses: number
+  attacks: number
+  weighted_fouls_committed: number
+  weighted_fouls_awarded: number
+  committed_breakdown: FoulBreakdown
+  awarded_breakdown: FoulBreakdown
+  expected_committed: number
+  expected_awarded: number
+  // Standardized residuals, signed so + = favoured.
+  z_leniency: number // let off when defending
+  z_protection: number // protected when attacking
+  favourability: number // z_leniency + z_protection
+  leniency_outlier: boolean
+  protection_outlier: boolean
+}
+
+export interface FavourabilityResponse {
+  competition_id: number
+  attack_definition: string
+  defense_definition: string
+  weights: SeverityWeights
+  rates: {
+    weighted_fouls_per_defense: number
+    weighted_fouls_per_attack: number
+  }
+  teams: FavourabilityTeam[]
+}
