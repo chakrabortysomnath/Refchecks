@@ -188,6 +188,7 @@ def calculate_favourability(
         teams[team_id] = {
             "team_id": team_id,
             "team_name": team.name if team else f"Team {team_id}",
+            "matches_played": len(match_ids),
             "defenses": defenses,
             "attacks": attacks,
             "weighted_fouls_committed": round(wfc, 2),

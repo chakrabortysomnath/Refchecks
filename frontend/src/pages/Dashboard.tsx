@@ -13,6 +13,10 @@ import type {
   SeverityWeights,
 } from '../api/types'
 
+// Teams with fewer than this many matches (e.g. group-stage exits in a World
+// Cup) produce noisy, small-sample z-scores, so they can be filtered out.
+const MIN_MATCHES = 4
+
 export default function Dashboard() {
   const { user, logout } = useAuth()
 
@@ -22,6 +26,7 @@ export default function Dashboard() {
   const [defenseDefinition, setDefenseDefinition] =
     useState<DefenseDefinition>('all_combined')
   const [weights, setWeights] = useState<SeverityWeights>({ ...DEFAULT_WEIGHTS })
+  const [hideSmallSamples, setHideSmallSamples] = useState(true)
 
   const fav = useFavourability(
     competitionId,
@@ -29,7 +34,14 @@ export default function Dashboard() {
     defenseDefinition,
     weights,
   )
-  const teams = fav.data?.teams ?? []
+  const allTeams = fav.data?.teams ?? []
+  // Filter is display-only: the neutral-referee baseline is still computed over
+  // every team server-side, so hiding a team doesn't shift the others' scores.
+  const hiddenCount = allTeams.filter((t) => t.matches_played < MIN_MATCHES)
+    .length
+  const teams = hideSmallSamples
+    ? allTeams.filter((t) => t.matches_played >= MIN_MATCHES)
+    : allTeams
   const mostFavoured = teams[0]
   const mostPoliced = teams[teams.length - 1]
 
@@ -86,6 +98,26 @@ export default function Dashboard() {
           />
 
           <WeightControls weights={weights} onChange={setWeights} />
+
+          {/* Sample-size filter */}
+          <div className="rounded-xl bg-white ring-1 ring-slate-200 px-5 py-4 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hideSmallSamples}
+                onChange={(e) => setHideSmallSamples(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-pitch-600 focus:ring-pitch-500"
+              />
+              <span className="text-sm font-medium text-slate-700">
+                Hide teams with fewer than {MIN_MATCHES} matches
+              </span>
+            </label>
+            <span className="text-xs text-slate-400">
+              {hideSmallSamples
+                ? `${hiddenCount} small-sample team${hiddenCount === 1 ? '' : 's'} hidden · ${teams.length} shown`
+                : `showing all ${allTeams.length} teams`}
+            </span>
+          </div>
 
           {/* Headline insight */}
           {mostFavoured && mostPoliced && (

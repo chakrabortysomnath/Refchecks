@@ -7,6 +7,7 @@ interface Props {
 
 type SortKey =
   | 'team_name'
+  | 'matches_played'
   | 'favourability'
   | 'z_leniency'
   | 'z_protection'
@@ -20,6 +21,12 @@ const COLUMNS: {
   desc: string
 }[] = [
   { key: 'team_name', label: 'Team', numeric: false, desc: 'Team, aggregated across all its matches.' },
+  {
+    key: 'matches_played',
+    label: 'MP',
+    numeric: true,
+    desc: 'Matches played in the competition. Fewer matches means a noisier, smaller-sample score.',
+  },
   {
     key: 'favourability',
     label: 'Favourability',
@@ -138,6 +145,9 @@ export default function FavourabilityTable({ teams }: Props) {
               >
                 <td className="px-4 py-2 font-medium text-slate-900 whitespace-nowrap">
                   {t.team_name}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums text-slate-500">
+                  {t.matches_played}
                 </td>
                 <td
                   className={
