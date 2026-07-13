@@ -11,7 +11,9 @@ import logging
 
 from app.config import settings
 from app.database import create_all_tables
-from app.routes import auth, competitions, matches, bias, statistics, admin
+from app.routes import (
+    auth, competitions, matches, bias, statistics, admin, favourability
+)
 
 
 # ===== LOGGING SETUP =====
@@ -140,6 +142,13 @@ app.include_router(
     statistics.router,
     prefix="/api",
     tags=["Statistics & Visualization"],
+    responses={400: {"description": "Invalid parameters"}},
+)
+
+app.include_router(
+    favourability.router,
+    prefix="/api",
+    tags=["Favourability"],
     responses={400: {"description": "Invalid parameters"}},
 )
 
