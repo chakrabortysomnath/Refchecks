@@ -143,6 +143,7 @@ export type FoulBreakdown = Record<keyof SeverityWeights, number>
 export interface FavourabilityTeam {
   team_id: number
   team_name: string
+  matches_played: number
   defenses: number
   attacks: number
   weighted_fouls_committed: number
