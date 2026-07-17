@@ -113,6 +113,52 @@ Documentation: **http://localhost:8000/docs**
 
 ---
 
+## Loading New Competition Data
+
+Populate the backend tables (`competitions`, `teams`, `matches`, `events`, `fouls`, `bias_metrics`) with a new competition from Statsbomb Open Data.
+
+### Option A — Admin HTTP endpoints (production / Render, no shell)
+
+Render's free tier has no shell, so loading is driven through secret-key-protected admin endpoints (all under the `/api` prefix). Set `ADMIN_SETUP_KEY` in the backend environment first, then run the steps in order:
+
+| # | Step | Request |
+|---|------|---------|
+| 1 | Create tables (first deploy only) | `POST /api/admin/init-db?key=ADMIN_SETUP_KEY` |
+| 2 | Find the exact competition name | `GET /api/admin/list-competitions?key=ADMIN_SETUP_KEY` |
+| 3 | Load matches + events + fouls + bias metrics (runs in background, several minutes) | `POST /api/admin/load-competition?competition_name=<name>&key=ADMIN_SETUP_KEY` |
+| 4 | Poll until the new competition appears | `GET /api/competitions` |
+| 5 | (Only if `team_fouls_against_id` is null on older fouls) backfill | `POST /api/admin/backfill-fouls-against?key=ADMIN_SETUP_KEY` |
+| 6 | Recalculate bias metrics after a backfill/fix | `POST /api/admin/recalculate-bias?competition_id=<id>&key=ADMIN_SETUP_KEY` |
+
+The `competition_name` must exactly match a value returned by step 2 (URL-encode spaces), e.g. `FIFA World Cup - 2022`.
+
+Example with `curl`:
+
+```bash
+# List available competitions
+curl "https://fefchecks-api.onrender.com/api/admin/list-competitions?key=$ADMIN_SETUP_KEY"
+
+# Load one (URL-encode spaces as %20)
+curl -X POST "https://fefchecks-api.onrender.com/api/admin/load-competition?competition_name=FIFA%20World%20Cup%20-%202022&key=$ADMIN_SETUP_KEY"
+
+# Check it landed
+curl "https://fefchecks-api.onrender.com/api/competitions"
+```
+
+You can also run any of these interactively from the Swagger UI at `/docs`.
+
+### Option B — CLI script (local dev only)
+
+With shell access and the app configured locally:
+
+```bash
+python scripts/load_competition.py --competition "FIFA World Cup - 2022"
+```
+
+This is not available on Render's free tier (no shell) — use Option A there.
+
+---
+
 ## Attack & Defense Definitions
 
 Users can select different event classifications:
